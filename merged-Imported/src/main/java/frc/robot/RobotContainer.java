@@ -9,6 +9,7 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.auto.NamedCommands;
 import com.revrobotics.spark.config.SparkBaseConfig;
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.*;
@@ -24,6 +25,8 @@ import frc.robot.subsystems.Shooter;
 import static frc.robot.Constants.*;
 
 public class RobotContainer {
+
+    private static final double DRIVE_JOYSTICK_DEADBAND = 0.08;
 
     private final Drive drive = new Drive();
     private final Shooter shooter = new Shooter();
@@ -80,8 +83,10 @@ public class RobotContainer {
         // Default drive command
         drive.setDefaultCommand(
             new RunCommand(() -> {
-                var controls = getControls(m_driverController);
-                var thetaInput = m_driverController.getRightX() * MAX_ANGULAR_SPEED * 0.5;
+                var controls = new Translation2d(
+                    shapeDriveAxis(m_driverController.getLeftY()) * MAX_LINEAR_SPEED_TELEOP,
+                    shapeDriveAxis(m_driverController.getLeftX()) * MAX_LINEAR_SPEED_TELEOP);
+                var thetaInput = shapeDriveAxis(m_driverController.getRightX()) * MAX_ANGULAR_SPEED * 0.5;
                 boolean fieldOriented = fieldOrientedChooser.getSelected();
                 drive.drive(controls.getX(), controls.getY(), thetaInput, fieldOriented);
             }, drive)
@@ -143,6 +148,12 @@ public class RobotContainer {
     
         // Y: Intake arm up
         m_operatorController.y().onTrue(intake.intakeUp());
+    }
+
+    // Blend linear and cubic response for precise starts without a sluggish midrange.
+    private static double shapeDriveAxis(double input) {
+        double adjusted = MathUtil.applyDeadband(input, DRIVE_JOYSTICK_DEADBAND);
+        return 0.35 * adjusted + 0.65 * adjusted * adjusted * adjusted;
     }
 
     public static Translation2d getControls(CommandXboxController controller) {
